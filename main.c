@@ -77,6 +77,8 @@ terminal(void)
   struct termios termio2;
   char buf[64];
 
+  printf("Exit with ^B\n");
+
   if(!isatty(0)) {
     fprintf(stderr, "stdin is not a tty\n");
     exit(1);
@@ -86,7 +88,7 @@ terminal(void)
     exit(1);
   }
   termio2 = termio;
-  termio2.c_lflag &= ~(ECHO | ICANON);
+  termio2.c_lflag &= ~(ECHO | ICANON | ISIG);
   if(1) {
     if(tcsetattr(0, TCSANOW, &termio2) == -1)
       return;
@@ -96,32 +98,49 @@ terminal(void)
 
   fds[0].fd = 0;
   fds[1].fd = fd;
-  fds[0].events = POLLIN;
-  fds[1].events = POLLIN;
+  fds[0].events = POLLIN | POLLHUP;
+  fds[1].events = POLLIN | POLLHUP;
 
   signal(SIGINT, doexit);
 
   while(1) {
     poll(fds, 2, -1);
 
+    if(fds[0].revents & (POLLERR | POLLHUP))
+      break;
+    if(fds[1].revents & (POLLERR | POLLHUP))
+      break;
+
     if(fds[0].revents & POLLIN) {
-      if(read(0, buf, 1) != 1)
+      if(read(0, buf, 1) != 1) {
         perror("read");
-      if(write(fd, buf, 1) != 1)
+        break;
+      }
+      if(buf[0] == 2)
+        break;
+
+      if(write(fd, buf, 1) != 1) {
         perror("write");
+        break;
+      }
 
     }
 
     if(fds[1].revents & POLLIN) {
-      if(read(fd, buf, 1) != 1)
+      if(read(fd, buf, 1) != 1) {
         perror("read");
-      if(write(1, buf, 1) != 1)
+        break;
+      }
+      if(write(1, buf, 1) != 1) {
         perror("write");
+        break;
+      }
     }
   }
 
 
   tcsetattr(0, TCSANOW, &termio);
+  printf("Exiting...\n");
   exit(0);
 }
 
