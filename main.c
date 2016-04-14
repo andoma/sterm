@@ -59,14 +59,6 @@ setupdev(int baudrate)
 
 static struct termios termio;
 
-static void
-doexit(int x)
-{
-  printf("CTRL-C\n");
-  tcsetattr(0, TCSANOW, &termio);
-  exit(0);
-}
-
 
 /**
  *
@@ -100,8 +92,6 @@ terminal(void)
   fds[1].fd = fd;
   fds[0].events = POLLIN | POLLHUP;
   fds[1].events = POLLIN | POLLHUP;
-
-  signal(SIGINT, doexit);
 
   while(1) {
     poll(fds, 2, -1);
