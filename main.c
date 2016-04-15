@@ -33,6 +33,9 @@ setupdev(int baudrate)
   case 9600:
     cflags |= B9600;
     break;
+  case 19200:
+    cflags |= B19200;
+    break;
   case 38400:
     cflags |= B38400;
     break;
@@ -42,7 +45,9 @@ setupdev(int baudrate)
   case 115200:
     cflags |= B115200;
     break;
-
+  default:
+    printf("Baudrate %d not supported\n", baudrate);
+    return -1;
   }
 
 
