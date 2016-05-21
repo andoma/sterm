@@ -140,17 +140,49 @@ terminal(void)
 }
 
 
+
+static void
+usage(const char *argv0)
+{
+  printf("Usage: %s OPTIONS\n\n", argv0);
+  printf("   -d DEVICE    [/dev/ttyUSB0]\n");
+  printf("   -b BAUDRATE  [115200]\n");
+  printf("\n");
+  printf("   -R Toogle RTS on start\n");
+  printf("   -D Toogle DTR on start\n");
+  printf("\n");
+}
+
 int
 main(int argc, char **argv)
 {
   const char *device = "/dev/ttyUSB0";
   int baudrate = 115200;
+  int toggle_dtr = 0;
+  int toggle_rts = 0;
+  int opt;
 
-  if(argc >= 2) {
-    device = argv[1];
-  }
-  if(argc >= 3) {
-    baudrate = atoi(argv[2]);
+  while((opt = getopt(argc, argv, "d:b:RDh")) != -1) {
+    switch(opt) {
+    case 'b':
+      baudrate = atoi(optarg);
+      break;
+    case 'd':
+      device = optarg;
+      break;
+    case 'R':
+      toggle_rts = 1;
+      break;
+    case 'D':
+      toggle_dtr = 1;
+      break;
+    case 'h':
+      usage(argv[0]);
+      exit(0);
+    default:
+      usage(argv[0]);
+      exit(1);
+    }
   }
 
   fd = open(device, O_RDWR | O_NOCTTY);
@@ -160,6 +192,25 @@ main(int argc, char **argv)
   }
 
    setupdev(baudrate);
+
+   if(toggle_dtr) {
+     // Turn on DTR
+     printf("Toggle DTR\n");
+     int f = TIOCM_DTR;
+     ioctl(fd, TIOCMBIC, &f);
+     usleep(1000);
+     ioctl(fd, TIOCMBIS, &f);
+   }
+
+   if(toggle_rts) {
+     // Turn on RTS
+     printf("Toggle RTS\n");
+     int f = TIOCM_RTS;
+     ioctl(fd, TIOCMBIS, &f);
+     usleep(1000);
+     ioctl(fd, TIOCMBIC, &f);
+   }
+
 
    terminal();
    return 0;
