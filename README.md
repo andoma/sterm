@@ -20,7 +20,7 @@ will default open /dev/ttyUSB0 with baudrate 115200
 Device and baudrate can be passed as command line arguments:
 
 ```
-sterm [device [baudrate]]
+sterm -d device -b baudrate
 ```
 
 GLHF
