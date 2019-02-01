@@ -69,10 +69,10 @@ static struct termios termio;
  *
  */
 static void
-terminal(void)
+terminal(int hex_mode)
 {
   struct termios termio2;
-  char buf[64];
+  uint8_t buf[64];
 
   printf("Exit with ^B\n");
 
@@ -126,9 +126,20 @@ terminal(void)
         perror("read");
         break;
       }
-      if(write(1, buf, 1) != 1) {
-        perror("write");
-        break;
+      if(hex_mode) {
+        char hex[8];
+        snprintf(hex, sizeof(hex), "%02x '%c'\n", buf[0],
+                 buf[0] >= 32 && buf[0] < 128 ? buf[0] : '.');
+        if(write(1, hex, 7) != 7) {
+          perror("write");
+          break;
+        }
+
+      } else {
+        if(write(1, buf, 1) != 1) {
+          perror("write");
+          break;
+        }
       }
     }
   }
@@ -150,6 +161,7 @@ usage(const char *argv0)
   printf("\n");
   printf("   -R Toogle RTS on start\n");
   printf("   -D Toogle DTR on start\n");
+  printf("   -H Output hex values\n");
   printf("\n");
 }
 
@@ -160,9 +172,10 @@ main(int argc, char **argv)
   int baudrate = 115200;
   int toggle_dtr = 0;
   int toggle_rts = 0;
+  int hex_mode = 0;
   int opt;
 
-  while((opt = getopt(argc, argv, "d:b:RDh")) != -1) {
+  while((opt = getopt(argc, argv, "d:b:RDhH")) != -1) {
     switch(opt) {
     case 'b':
       baudrate = atoi(optarg);
@@ -175,6 +188,9 @@ main(int argc, char **argv)
       break;
     case 'D':
       toggle_dtr = 1;
+      break;
+    case 'H':
+      hex_mode = 1;
       break;
     case 'h':
       usage(argv[0]);
@@ -212,6 +228,6 @@ main(int argc, char **argv)
    }
 
 
-   terminal();
+   terminal(hex_mode);
    return 0;
 }
