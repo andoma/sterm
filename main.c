@@ -1,3 +1,5 @@
+#include <netinet/in.h>
+#include <arpa/inet.h>
 #include <sys/param.h>
 #include <stdint.h>
 #include <sys/types.h>
@@ -122,7 +124,11 @@ terminal(int hex_mode)
     }
 
     if(fds[1].revents & POLLIN) {
-      if(read(fd, buf, 1) != 1) {
+      int r = read(fd, buf, 1);
+      if(r == 0) {
+        break;
+      }
+      if(r < 0) {
         perror("read");
         break;
       }
@@ -158,6 +164,7 @@ usage(const char *argv0)
   printf("Usage: %s OPTIONS\n\n", argv0);
   printf("   -d DEVICE    [/dev/ttyUSB0]\n");
   printf("   -b BAUDRATE  [115200]\n");
+  printf("   -c HOST:PORT Connect to TCP HOST:PORT\n");
   printf("\n");
   printf("   -R Toogle RTS on start\n");
   printf("   -D Toogle DTR on start\n");
@@ -170,12 +177,13 @@ main(int argc, char **argv)
 {
   const char *device = "/dev/ttyUSB0";
   int baudrate = 115200;
+  char *hostport = NULL;
   int toggle_dtr = 0;
   int toggle_rts = 0;
   int hex_mode = 0;
   int opt;
 
-  while((opt = getopt(argc, argv, "d:b:RDhH")) != -1) {
+  while((opt = getopt(argc, argv, "d:b:RDhHc:")) != -1) {
     switch(opt) {
     case 'b':
       baudrate = atoi(optarg);
@@ -192,6 +200,9 @@ main(int argc, char **argv)
     case 'H':
       hex_mode = 1;
       break;
+    case 'c':
+      hostport = optarg;
+      break;
     case 'h':
       usage(argv[0]);
       exit(0);
@@ -200,6 +211,37 @@ main(int argc, char **argv)
       exit(1);
     }
   }
+
+  if(hostport != NULL) {
+
+    fd = socket(AF_INET, SOCK_STREAM, 0);
+    if(fd == -1) {
+      perror("socket");
+      exit(1);
+    }
+
+    int port = 3000;
+
+    char *portstr = strchr(hostport, ':');
+    if(portstr != NULL) {
+      port = atoi(portstr + 1);
+      *portstr = 0;
+    }
+
+    struct sockaddr_in sin = {
+      .sin_family = AF_INET,
+      .sin_port = htons(port),
+      .sin_addr.s_addr = inet_addr(hostport)
+    };
+
+    if(connect(fd, (struct sockaddr *)&sin, sizeof(sin)) == -1) {
+      perror("connect");
+      exit(1);
+    }
+    terminal(hex_mode);
+    return 0;
+  }
+
 
   fd = open(device, O_RDWR | O_NOCTTY);
   if(fd == -1) {
