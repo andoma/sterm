@@ -71,12 +71,11 @@ static struct termios termio;
  *
  */
 static void
-terminal(int hex_mode)
+terminal(int hex_mode, int line_mode)
 {
-  struct termios termio2;
   uint8_t buf[64];
 
-  printf("Exit with ^B\n");
+  printf("Exit with ^%c\n", line_mode ? 'C' : 'B');
 
   if(!isatty(0)) {
     fprintf(stderr, "stdin is not a tty\n");
@@ -86,9 +85,12 @@ terminal(int hex_mode)
     perror("tcgetattr");
     exit(1);
   }
-  termio2 = termio;
-  termio2.c_lflag &= ~(ECHO | ICANON | ISIG);
-  if(1) {
+  if(!line_mode) {
+
+    struct termios termio2;
+    termio2 = termio;
+    termio2.c_lflag &= ~(ECHO | ICANON | ISIG);
+
     if(tcsetattr(0, TCSANOW, &termio2) == -1)
       return;
   }
@@ -113,14 +115,13 @@ terminal(int hex_mode)
         perror("read");
         break;
       }
-      if(buf[0] == 2)
+      if(!line_mode && buf[0] == 2)
         break;
 
       if(write(fd, buf, 1) != 1) {
         perror("write");
         break;
       }
-
     }
 
     if(fds[1].revents & POLLIN) {
@@ -169,6 +170,7 @@ usage(const char *argv0)
   printf("   -R Toogle RTS on start\n");
   printf("   -D Toogle DTR on start\n");
   printf("   -H Output hex values\n");
+  printf("   -l Line mode (including local echo)\n");
   printf("\n");
 }
 
@@ -181,9 +183,10 @@ main(int argc, char **argv)
   int toggle_dtr = 0;
   int toggle_rts = 0;
   int hex_mode = 0;
+  int line_mode = 0;
   int opt;
 
-  while((opt = getopt(argc, argv, "d:b:RDhHc:")) != -1) {
+  while((opt = getopt(argc, argv, "d:b:RDhHc:l")) != -1) {
     switch(opt) {
     case 'b':
       baudrate = atoi(optarg);
@@ -199,6 +202,9 @@ main(int argc, char **argv)
       break;
     case 'H':
       hex_mode = 1;
+      break;
+    case 'l':
+      line_mode = 1;
       break;
     case 'c':
       hostport = optarg;
@@ -238,7 +244,7 @@ main(int argc, char **argv)
       perror("connect");
       exit(1);
     }
-    terminal(hex_mode);
+    terminal(hex_mode, line_mode);
     return 0;
   }
 
@@ -270,6 +276,6 @@ main(int argc, char **argv)
    }
 
 
-   terminal(hex_mode);
+   terminal(hex_mode, line_mode);
    return 0;
 }
