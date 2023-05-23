@@ -66,16 +66,19 @@ setupdev(int baudrate)
 
 static struct termios termio;
 
+static int g_hex_mode;
+static int g_line_mode;
+static int g_lf_sends_cr;
 
 /**
  *
  */
 static void
-terminal(int hex_mode, int line_mode)
+terminal(void)
 {
   uint8_t buf[64];
 
-  printf("Exit with ^%c\n", line_mode ? 'C' : 'B');
+  printf("Exit with ^%c\n", g_line_mode ? 'C' : 'B');
 
   if(!isatty(0)) {
     fprintf(stderr, "stdin is not a tty\n");
@@ -85,7 +88,7 @@ terminal(int hex_mode, int line_mode)
     perror("tcgetattr");
     exit(1);
   }
-  if(!line_mode) {
+  if(!g_line_mode) {
 
     struct termios termio2;
     termio2 = termio;
@@ -115,8 +118,11 @@ terminal(int hex_mode, int line_mode)
         perror("read");
         break;
       }
-      if(!line_mode && buf[0] == 2)
+      if(!g_line_mode && buf[0] == 2)
         break;
+
+      if(buf[0] == 10 && g_lf_sends_cr)
+        buf[0] = 13;
 
       if(write(fd, buf, 1) != 1) {
         perror("write");
@@ -133,7 +139,7 @@ terminal(int hex_mode, int line_mode)
         perror("read");
         break;
       }
-      if(hex_mode) {
+      if(g_hex_mode) {
         char hex[8];
         snprintf(hex, sizeof(hex), "%02x '%c'\n", buf[0],
                  buf[0] >= 32 && buf[0] < 128 ? buf[0] : '.');
@@ -171,6 +177,7 @@ usage(const char *argv0)
   printf("   -D Toogle DTR on start\n");
   printf("   -H Output hex values\n");
   printf("   -l Line mode (including local echo)\n");
+  printf("   -C LF sends CR\n");
   printf("\n");
 }
 
@@ -182,11 +189,9 @@ main(int argc, char **argv)
   char *hostport = NULL;
   int toggle_dtr = 0;
   int toggle_rts = 0;
-  int hex_mode = 0;
-  int line_mode = 0;
   int opt;
 
-  while((opt = getopt(argc, argv, "d:b:RDhHc:l")) != -1) {
+  while((opt = getopt(argc, argv, "d:b:RDhHc:lC")) != -1) {
     switch(opt) {
     case 'b':
       baudrate = atoi(optarg);
@@ -201,10 +206,13 @@ main(int argc, char **argv)
       toggle_dtr = 1;
       break;
     case 'H':
-      hex_mode = 1;
+      g_hex_mode = 1;
       break;
     case 'l':
-      line_mode = 1;
+      g_line_mode = 1;
+      break;
+    case 'C':
+      g_lf_sends_cr = 1;
       break;
     case 'c':
       hostport = optarg;
@@ -244,7 +252,7 @@ main(int argc, char **argv)
       perror("connect");
       exit(1);
     }
-    terminal(hex_mode, line_mode);
+    terminal();
     return 0;
   }
 
@@ -276,6 +284,6 @@ main(int argc, char **argv)
    }
 
 
-   terminal(hex_mode, line_mode);
+   terminal();
    return 0;
 }
