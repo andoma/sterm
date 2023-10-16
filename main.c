@@ -13,9 +13,9 @@
 #include <errno.h>
 #include <unistd.h>
 #include <stdlib.h>
-#include <termios.h>
 #include <sys/ioctl.h>
 
+#include <termios.h>
 
 static struct termios tio;
 
@@ -51,7 +51,6 @@ setupdev(int baudrate)
     printf("Baudrate %d not supported\n", baudrate);
     return -1;
   }
-
 
   tio.c_cflag = cflags;
   tio.c_iflag = IGNPAR;
@@ -131,7 +130,7 @@ terminal(void)
     }
 
     if(fds[1].revents & POLLIN) {
-      int r = read(fd, buf, 1);
+      int r = read(fd, buf, sizeof(buf));
       if(r == 0) {
         break;
       }
@@ -140,16 +139,18 @@ terminal(void)
         break;
       }
       if(g_hex_mode) {
-        char hex[8];
-        snprintf(hex, sizeof(hex), "%02x '%c'\n", buf[0],
-                 buf[0] >= 32 && buf[0] < 128 ? buf[0] : '.');
-        if(write(1, hex, 7) != 7) {
-          perror("write");
-          break;
+        for(int i = 0; i < r; i++) {
+          char hex[8];
+          snprintf(hex, sizeof(hex), "%02x '%c'\n", buf[i],
+                   buf[i] >= 32 && buf[i] < 128 ? buf[i] : '.');
+          if(write(1, hex, 7) != 7) {
+            perror("write");
+            break;
+          }
         }
 
       } else {
-        if(write(1, buf, 1) != 1) {
+        if(write(1, buf, r) != r) {
           perror("write");
           break;
         }
@@ -181,6 +182,44 @@ usage(const char *argv0)
   printf("\n");
 }
 
+
+#ifdef __linux__
+struct sockaddr_l2 {
+  sa_family_t l2_family;
+  uint16_t l2_psm;
+  uint8_t l2_bdaddr[6];
+  uint16_t l2_vid;
+  uint8_t l2_bdaddr_type;
+};
+
+#define BDADDR_BREDR		0x00
+#define BDADDR_LE_PUBLIC	0x01
+#define BDADDR_LE_RANDOM	0x02
+
+
+static int
+hexnibble(const char **s)
+{
+  while(1) {
+    char c = **s;
+    if(c == 0)
+      return -1;
+
+    *s = *s + 1;
+    switch(c) {
+    case '0' ... '9':
+      return c - '0';
+    case 'a' ... 'f':
+      return c - 'a' + 10;
+    case 'A' ... 'F':
+      return c - 'A' + 10;
+    }
+  }
+}
+
+
+#endif
+
 int
 main(int argc, char **argv)
 {
@@ -190,11 +229,15 @@ main(int argc, char **argv)
   int toggle_dtr = 0;
   int toggle_rts = 0;
   int opt;
+  const char *bleaddr = NULL;
 
-  while((opt = getopt(argc, argv, "d:b:RDhHc:lC")) != -1) {
+  while((opt = getopt(argc, argv, "d:b:RDhHc:lCB:")) != -1) {
     switch(opt) {
     case 'b':
       baudrate = atoi(optarg);
+      break;
+    case 'B':
+      bleaddr = optarg;
       break;
     case 'd':
       device = optarg;
@@ -225,6 +268,64 @@ main(int argc, char **argv)
       exit(1);
     }
   }
+
+  if(bleaddr != NULL) {
+#ifdef __linux__
+
+    fd = socket(PF_BLUETOOTH, SOCK_STREAM, 0);
+    if(fd == -1) {
+      perror("socket");
+      exit(1);
+    }
+
+    struct sockaddr_l2 addr = {0};
+
+    addr.l2_family = AF_BLUETOOTH;
+    addr.l2_bdaddr_type = BDADDR_LE_RANDOM;
+    if(bind(fd, (struct sockaddr *) &addr, sizeof(addr)) == -1) {
+      perror("bind");
+      exit(1);
+    }
+
+    for(int i = 5 ; i >= 0; i--) {
+      int h = hexnibble(&bleaddr);
+      int l = hexnibble(&bleaddr);
+      if(h == -1 || l == -1) {
+        fprintf(stderr, "Malformed address\n");
+        exit(1);
+      }
+      addr.l2_bdaddr[i] = (h << 4) | l;
+    }
+
+
+    addr.l2_bdaddr_type = BDADDR_LE_RANDOM;
+    addr.l2_psm = 0x80 + 23;
+    if(*bleaddr == ':')
+      addr.l2_psm = atoi(bleaddr + 1);
+
+    fprintf(stderr, "Connecting to %02x:%02x:%02x:%02x:%02x:%02x:%d\n",
+            addr.l2_bdaddr[5],
+            addr.l2_bdaddr[4],
+            addr.l2_bdaddr[3],
+            addr.l2_bdaddr[2],
+            addr.l2_bdaddr[1],
+            addr.l2_bdaddr[0],
+            addr.l2_psm);
+
+    if(connect(fd, (struct sockaddr *) &addr, sizeof(addr)) == -1) {
+      perror("connect");
+      exit(1);
+    }
+
+    terminal();
+    return 0;
+
+#else
+    fprintf(stderr, "Bluetooth not supported on this platform\n");
+    exit(1);
+#endif
+  }
+
 
   if(hostport != NULL) {
 
