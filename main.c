@@ -47,6 +47,11 @@ setupdev(int baudrate)
   case 115200:
     cflags |= B115200;
     break;
+#ifdef B1000000
+  case 1000000:
+    cflags |= B1000000;
+    break;
+#endif
   default:
     printf("Baudrate %d not supported\n", baudrate);
     return -1;
