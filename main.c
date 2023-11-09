@@ -15,11 +15,14 @@
 #include <stdlib.h>
 #include <termios.h>
 #include <sys/ioctl.h>
-
+#include <time.h>
 
 static struct termios tio;
 
 static int fd;
+
+static int g_trace_fd = -1;
+
 /**
  *
  */
@@ -158,6 +161,13 @@ terminal(void)
           perror("write");
           break;
         }
+
+        if(g_trace_fd != -1) {
+          if(write(g_trace_fd, buf, 1) != 1) {
+            perror("write");
+            break;
+          }
+        }
       }
     }
   }
@@ -177,6 +187,7 @@ usage(const char *argv0)
   printf("   -d DEVICE    [/dev/ttyUSB0]\n");
   printf("   -b BAUDRATE  [115200]\n");
   printf("   -c HOST:PORT Connect to TCP HOST:PORT\n");
+  printf("   -w TRACEFILE Write contents to TRACEFILE\n");
   printf("\n");
   printf("   -R Toogle RTS on start\n");
   printf("   -D Toogle DTR on start\n");
@@ -195,9 +206,13 @@ main(int argc, char **argv)
   int toggle_dtr = 0;
   int toggle_rts = 0;
   int opt;
+  const char *trace_file = NULL;
 
-  while((opt = getopt(argc, argv, "d:b:RDhHc:lC")) != -1) {
+  while((opt = getopt(argc, argv, "d:b:RDhHc:lCw:")) != -1) {
     switch(opt) {
+    case 'w':
+      trace_file = optarg;
+      break;
     case 'b':
       baudrate = atoi(optarg);
       break;
@@ -229,6 +244,18 @@ main(int argc, char **argv)
       usage(argv[0]);
       exit(1);
     }
+  }
+
+  if(trace_file) {
+    g_trace_fd = open(trace_file, O_CREAT | O_APPEND | O_WRONLY, 0666);
+    if(g_trace_fd < 0) {
+      fprintf(stderr, "Failed to open trace file %s -- %s\n",
+              trace_file, strerror(errno));
+      exit(1);
+    }
+
+    time_t now = time(NULL);
+    dprintf(g_trace_fd, "=== Session start at %s\n", ctime(&now));
   }
 
   if(hostport != NULL) {
