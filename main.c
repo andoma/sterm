@@ -129,10 +129,14 @@ terminal(void)
       if(!g_line_mode && buf[0] == 2)
         break;
 
-      if(buf[0] == 10 && g_lf_sends_cr)
+      int len = 1;
+      if(buf[0] == 10 && g_lf_sends_cr) {
         buf[0] = 13;
+        buf[1] = 10;
+        len = MIN(g_lf_sends_cr, 2);
+      }
 
-      if(write(fd, buf, 1) != 1) {
+      if(write(fd, buf, len) != len) {
         perror("write");
         break;
       }
@@ -193,7 +197,7 @@ usage(const char *argv0)
   printf("   -D Toogle DTR on start\n");
   printf("   -H Output hex values\n");
   printf("   -l Line mode (including local echo)\n");
-  printf("   -C LF sends CR\n");
+  printf("   -C LF sends CR (twice for CR+LF)\n");
   printf("\n");
 }
 
@@ -232,7 +236,7 @@ main(int argc, char **argv)
       g_line_mode = 1;
       break;
     case 'C':
-      g_lf_sends_cr = 1;
+      g_lf_sends_cr++;
       break;
     case 'c':
       hostport = optarg;
