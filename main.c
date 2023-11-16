@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/file.h>
 #include <fcntl.h>
 #include <poll.h>
 
@@ -296,6 +297,10 @@ main(int argc, char **argv)
   fd = open(device, O_RDWR | O_NOCTTY);
   if(fd == -1) {
     perror("open serial port");
+    exit(1);
+  }
+  if(ioctl(fd, TIOCEXCL) || flock(fd, LOCK_EX | LOCK_NB)) {
+    perror("Unable to obtain exclusive lock of serial port");
     exit(1);
   }
 
