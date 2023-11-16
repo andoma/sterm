@@ -299,27 +299,27 @@ main(int argc, char **argv)
     exit(1);
   }
 
-   setupdev(baudrate);
+  setupdev(baudrate);
 
-   if(toggle_dtr) {
-     // Turn on DTR
-     printf("Toggle DTR\n");
-     int f = TIOCM_DTR;
-     ioctl(fd, TIOCMBIC, &f);
-     usleep(1000);
-     ioctl(fd, TIOCMBIS, &f);
-   }
+  if(toggle_dtr) {
+    // Turn on DTR
+    printf("Toggle DTR\n");
+    int f = TIOCM_DTR;
+    ioctl(fd, TIOCMBIC, &f);
+    usleep(1000);
+    ioctl(fd, TIOCMBIS, &f);
+  }
 
-   if(toggle_rts) {
-     // Turn on RTS
-     printf("Toggle RTS\n");
-     int f = TIOCM_RTS;
-     ioctl(fd, TIOCMBIS, &f);
-     usleep(1000);
-     ioctl(fd, TIOCMBIC, &f);
-   }
+  if(toggle_rts) {
+    // Turn on RTS
+    printf("Toggle RTS\n");
+    int f = TIOCM_RTS;
+    ioctl(fd, TIOCMBIS, &f);
+    usleep(1000);
+    ioctl(fd, TIOCMBIC, &f);
+  }
 
 
-   terminal();
-   return 0;
+  terminal();
+  return 0;
 }
